@@ -12,6 +12,8 @@ from langchain.agents import create_agent, AgentState
 from langgraph.config import get_stream_writer
 from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage, HumanMessage, AIMessageChunk
 from langchain.agents.middleware import LLMToolSelectorMiddleware, ModelRequest, ModelResponse, AgentMiddleware
+import time
+from loguru import logger
 
 from agentchat.api.services.agent_skill import AgentSkillService
 from agentchat.core.agents.skill_agent import SkillAgent
@@ -275,27 +277,39 @@ class GeneralAgent:
 
     async def setup_agent_skill_as_tools(self) -> List[BaseTool]:
         agent_skill_as_tools = []
-        agent_skills = await AgentSkillService.get_agent_skills_by_ids(self.agent_config.agent_skill_ids)
-
+        agent_skills = await AgentSkillService.get_agent_skills_by_ids(
+            self.agent_config.agent_skill_ids
+        )
+    
         def create_skill_agent_as_tool(agent_skill: AgentSkill):
-
+    
             @tool(agent_skill.as_tool_name, description=agent_skill.description)
             async def call_skill_agent(query: str):
-                """调用技能Agent"""
+                start = time.time()
+                logger.info(f"[skill-tool] start name={agent_skill.name}, query={query}")
+    
                 skill_agent = SkillAgent(agent_skill, self.agent_config.user_id)
+                logger.info(f"[skill-tool] before init {agent_skill.name}")
                 await skill_agent.init_skill_agent()
+                logger.info(f"[skill-tool] after init {agent_skill.name}, cost={time.time()-start:.2f}s")
+    
+                logger.info(f"[skill-tool] before ainvoke {agent_skill.name}")
                 messages = await skill_agent.ainvoke([HumanMessage(content=query)])
-                return "\n".join([message.content for message in messages])
-
+                logger.info(f"[skill-tool] after ainvoke {agent_skill.name}, cost={time.time()-start:.2f}s")
+    
+                result = "\n".join([message.content for message in messages])
+                logger.info(f"[skill-tool] end {agent_skill.name}, total_cost={time.time()-start:.2f}s, result_len={len(result)}")
+                return result
+    
             return call_skill_agent
-
+    
         for agent_skill in agent_skills:
             self.tool_metadata_map[agent_skill.as_tool_name] = {
-                "name": agent_skill.name,  # 技能的中文/友好名称
+                "name": agent_skill.name,
                 "type": "Skill"
             }
             agent_skill_as_tools.append(create_skill_agent_as_tool(agent_skill))
-
+    
         return agent_skill_as_tools
 
 

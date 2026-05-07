@@ -106,7 +106,7 @@ const goToRegister = () => {
           <div class="logo">
             <span class="logo-text">AgentChat</span>
           </div>
-          <p class="subtitle">更智能、更多元的大模型应用开发平台</p>
+          <p class="subtitle">个性化智能体对话平台</p>
         </div>
 
         <!-- 登录表单 -->
